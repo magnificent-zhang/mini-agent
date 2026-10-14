@@ -27,15 +27,20 @@ while True:
         }
     )
     reply = ""
-    for chunk in response:
-        if chunk.choices:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                print(delta,end="",flush=True)
-                reply += delta
-        if chunk.usage:
-            print()
-            print(chunk.usage)
-    messages.append({"role": "assistant", "content": reply})
+    try:
+        for chunk in response:
+            if chunk.choices:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    print(delta,end="",flush=True)
+                    reply += delta
+            if chunk.usage:
+                print()
+                print(chunk.usage)
+        messages.append({"role": "assistant", "content": reply})
+    except KeyboardInterrupt:
+        messages.append({"role":"assistant","content":reply + "\n[被用户中断]"})
+        response.close()
+        print(messages)
     print()
 
