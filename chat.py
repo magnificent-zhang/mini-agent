@@ -18,13 +18,24 @@ while True:
     messages.append({"role": "user", "content": user_input})
     # messages_least = messages[-6:]  # Keep only the last 6 messages for context 会出现system消息重复的问题
     recent = messages[1:][-7:]
-    print("recent:", recent)
     response = client.chat.completions.create(
         model = "deepseek-flash",
-        messages = messages[:1] + recent  # Include the system message for context,
+        messages = messages[:1] + recent,  # Include the system message for context,
+        stream = True,
+        stream_options = {
+            "include_usage": True
+        }
     )
-    reply = response.choices[0].message.content
+    reply = ""
+    for chunk in response:
+        if chunk.choices:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                print(delta,end="",flush=True)
+                reply += delta
+        if chunk.usage:
+            print()
+            print(chunk.usage)
     messages.append({"role": "assistant", "content": reply})
-    print(reply)
-    print(response.usage)
+    print()
 
