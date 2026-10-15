@@ -57,16 +57,18 @@ messages = [{"role": "system","content": "You are a useful assistant."}]
 
 while True:
     user_input = input("User:")
-    if user_input in ["exit","quit"]:
+    if user_input.lower() in ["exit","quit"]:
         print("see you later")
         break
     if user_input == "":
         continue
     messages.append({"role":"user","content":user_input})
-    i = 1 
+    i = 0
     while True:
-        if i > 10:
+        print(i)
+        if i > 1:
             print("超过最大轮数！")
+            messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
             break
         response = client.chat.completions.create(
             model = MODEL,
@@ -79,11 +81,12 @@ while True:
             for call in msg.tool_calls:
                 name = call.function.name
                 if name in available_tools:
+                    i = i + 1
                     func = available_tools[name]
                     args = json.loads(call.function.arguments)
                     result = str(func(**args))
                 else:
-                    result = "no useful tools exits"
+                    result = f"错误：工具 {name} 不存在。可用的工具有：{list(available_tools.keys())}"
                 messages.append({
                     "role":"tool",
                     "tool_call_id":call.id,
@@ -93,4 +96,5 @@ while True:
             print("model:",msg.content)
             messages.append({"role":"assistant","content":msg.content})
             break
+
 
