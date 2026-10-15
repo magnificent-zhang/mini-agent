@@ -50,7 +50,7 @@ tools = [
     }
 ]
 
-messages = [{"role": "user", "content": "现在几点？另外帮我算一下 1234 乘以 5678。"}]
+messages = [{"role": "user", "content": "现在几点？同时算一下小时数乘100"}]
 
 # 3. 第一次调用：把工具说明一起发过去
 response = client.chat.completions.create(
@@ -63,17 +63,25 @@ print(msg)
 print("finish_reason:", response.choices[0].finish_reason)
 print("tool_calls:", msg.tool_calls)
 
+
+available_tools = {
+    "get_current_time": get_current_time,
+    "multiply": multiply,
+}
+
 if msg.tool_calls:
     # 4. 先把模型这条"请求调用工具"的消息原样放回去
     messages.append(msg)
 
     # 5. 执行每一个工具调用，把结果作为 tool 消息放回去
     for call in msg.tool_calls:
-        if call.function.name == "multiply":
-            arguments = json.loads(call.function.arguments)
-            result = str(multiply(arguments.get('a'),arguments.get('b')))
-        if call.function.name == "get_current_time":
-            result = get_current_time()
+        name = call.function.name
+        if name in available_tools:
+            func = available_tools[name]
+            args = json.loads(call.function.arguments)
+            result = str(func(**args))
+        else:
+            result = f"错误：没有名为{call.function.name}的工具"
         messages.append({
             "role": "tool",
             "tool_call_id": call.id,
