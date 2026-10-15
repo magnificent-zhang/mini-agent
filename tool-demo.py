@@ -52,48 +52,43 @@ tools = [
 
 messages = [{"role": "user", "content": "现在几点？同时算一下小时数乘100"}]
 
-# 3. 第一次调用：把工具说明一起发过去
-response = client.chat.completions.create(
-    model=MODEL,
-    messages=messages,
-    tools=tools,
-)
-msg = response.choices[0].message
-print(msg)
-print("finish_reason:", response.choices[0].finish_reason)
-print("tool_calls:", msg.tool_calls)
-
-
 available_tools = {
     "get_current_time": get_current_time,
     "multiply": multiply,
 }
 
-if msg.tool_calls:
-    # 4. 先把模型这条"请求调用工具"的消息原样放回去
-    messages.append(msg)
+i = 1
 
-    # 5. 执行每一个工具调用，把结果作为 tool 消息放回去
-    for call in msg.tool_calls:
-        name = call.function.name
-        if name in available_tools:
-            func = available_tools[name]
-            args = json.loads(call.function.arguments)
-            result = str(func(**args))
-        else:
-            result = f"错误：没有名为{call.function.name}的工具"
-        messages.append({
-            "role": "tool",
-            "tool_call_id": call.id,
-            "content": result,
-        })
-    print(messages)
-    # 6. 第二次调用：模型看到工具结果，生成最终回答
-    response2 = client.chat.completions.create(
+while True:
+    if i > 10:
+        print("系统超过最大轮次")
+        break
+    i = i + 1
+    response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
         tools=tools,
     )
-    print("最终回答：", response2.choices[0].message.content)
-else:
-    print("模型直接回答：", msg.content)
+    msg = response.choices[0].message
+
+    if msg.tool_calls:
+        # 4. 先把模型这条"请求调用工具"的消息原样放回去
+        messages.append(msg)
+
+        # 5. 执行每一个工具调用，把结果作为 tool 消息放回去
+        for call in msg.tool_calls:
+            name = call.function.name
+            if name in available_tools:
+                func = available_tools[name]
+                args = json.loads(call.function.arguments)
+                result = str(func(**args))
+            else:
+                result = f"错误：没有名为{call.function.name}的工具"
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": result,
+            })
+    else:
+        print("模型回答：", msg.content)
+        break
