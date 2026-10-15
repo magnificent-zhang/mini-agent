@@ -18,6 +18,9 @@ def get_current_time():
 def multiply(a, b):
     return a * b
 
+def divide(a,b):
+    return a / b
+
 tools = [
     {
         "type":"function",
@@ -45,12 +48,28 @@ tools = [
                 "required":["a","b"],
             }
         }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"divide",
+            "description":"获取两个数的商",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "a":{"type":"number","description":"被除数"},
+                    "b":{"type":"number","description":"除数"},
+                },
+                "required":["a","b"],
+            }
+        }
     }
 ]
 
 available_tools = {
     "get_current_time": get_current_time,
     "multiply": multiply,
+    "divide": divide,
 }
 
 messages = [{"role": "system","content": "You are a useful assistant."}]
@@ -65,7 +84,6 @@ while True:
     messages.append({"role":"user","content":user_input})
     i = 0
     while True:
-        print(i)
         if i > 1:
             print("超过最大轮数！")
             messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
@@ -81,10 +99,12 @@ while True:
             for call in msg.tool_calls:
                 name = call.function.name
                 if name in available_tools:
-                    i = i + 1
                     func = available_tools[name]
-                    args = json.loads(call.function.arguments)
-                    result = str(func(**args))
+                    try:
+                        args = json.loads(call.function.arguments)
+                        result = str(func(**args))
+                    except Exception as e:
+                        result = f"工具执行出错：{type(e).__name__}:{e}"
                 else:
                     result = f"错误：工具 {name} 不存在。可用的工具有：{list(available_tools.keys())}"
                 messages.append({
