@@ -50,6 +50,20 @@ def write_file(path,content):
     full.write_text(content,encoding="utf-8")
     return f"已写入{path},共{len(content)}个字符"
 
+def edit_file(path,old_text,new_text):
+    full = safe_path(path)
+    content = full.read_text(encoding="utf-8")
+    times = content.count(old_text)
+    if times == 0:
+        return "没找到这段原文，请先用 read_file 确认文件内容"
+    elif times > 1:
+        return f"这段文本出现了 {times} 次，请提供更多上下文使它唯一"
+    else:
+        content = content.replace(old_text,new_text)
+        return "编辑成功"
+
+    
+
 tools = [
     {
         "type":"function",
@@ -125,7 +139,7 @@ tools = [
         "type":"function",
         "function":{
             "name":"write_file",
-            "description":"往一个指定文件夹中写文件",
+            "description":"创建新文件，或完整重写文件。修改已有文件的局部内容请用 edit_file",
             "parameters":{
                 "type":"object",
                 "properties":{
@@ -133,6 +147,22 @@ tools = [
                     "content":{"type":"string","description":"需要被写进新文件的内容"}
                 },
                 "required":["path","content"]
+            }
+        }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"edit_file",
+            "description":"编辑一个文件中的内容",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "path":{"type":"string","description":"相对于工作区的文件路径，例如 work/hello.txt"},
+                    "old_text":{"type":"string","description":"需要变更修改的旧内容"},
+                    "new_text":{"type":"string","description":"需要编辑替换的新内容"}
+                },
+                "required":["path","old_text","new_text"]
             }
         }
     }
@@ -144,10 +174,11 @@ available_tools = {
     "divide": divide,
     "read_file":read_file,
     "list_files":list_files,
-    "write_file":write_file
+    "write_file":write_file,
+    "edit_file":edit_file
 }
 
-NEEDS_APPROVAL = {"write_file"}
+NEEDS_APPROVAL = {"write_file","edit_file"}
 
 messages = [{"role": "system","content": "You are a useful assistant."}]
 
@@ -183,6 +214,15 @@ while True:
                 ).strip().lower() != "y":
                     result = "用户拒绝了这次操作"
                 else:
+                    arguments = json.loads(call.function.arguments)
+                    if name == "write_file":
+                        path = arguments.get("path")
+                        if (WORKSPACE / path).exists():
+                            print("将覆盖已有文件")
+                    if name == "edit_file":
+                        old_text = arguments.get("old_text")
+                        new_text = arguments.get("new_text")
+                        print(f"被修改的文本为：{old_text},修改后的文本为：{new_text}")
                     func = available_tools[name]
                     try:
                         args = json.loads(call.function.arguments)
