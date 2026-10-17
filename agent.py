@@ -59,10 +59,21 @@ def edit_file(path,old_text,new_text):
     elif times > 1:
         return f"这段文本出现了 {times} 次，请提供更多上下文使它唯一"
     else:
-        content = content.replace(old_text,new_text)
+        full.write_text(content.replace(old_text, new_text), encoding="utf-8")
         return "编辑成功"
 
-    
+def ask_approval(name, args):
+    print(f"\n[需要审批] 工具：{name}")
+    if name == "write_file":
+        path = args.get("path")
+        if (WORKSPACE / path).exists():
+            print("将覆盖已有文件")
+    if name == "edit_file":
+        old_text = args.get("old_text")
+        new_text = args.get("new_text")
+        print(f"被修改的文本为：{old_text},修改后的文本为：{new_text}")
+    answer = input("是否允许？(y/n) ")
+    return answer.strip().lower() == "y"
 
 tools = [
     {
@@ -154,7 +165,7 @@ tools = [
         "type":"function",
         "function":{
             "name":"edit_file",
-            "description":"编辑一个文件中的内容",
+            "description":"把文件中的一段原文替换为新文本。old_text 必须与文件中的内容完全一致（包括空格和换行），并且在文件中只出现一次。修改前请先用 read_file 查看原文。",
             "parameters":{
                 "type":"object",
                 "properties":{
@@ -209,24 +220,13 @@ while True:
                 name = call.function.name
                 if name not in available_tools:
                     result = f"错误：工具 {name} 不存在。可用的工具有：{list(available_tools.keys())}"
-                elif name in NEEDS_APPROVAL and input(
-                    f"\n[需要审批] 工具：{name}\n参数：{call.function.arguments}\n是否允许？(y/n) "
-                ).strip().lower() != "y":
-                    result = "用户拒绝了这次操作"
                 else:
-                    arguments = json.loads(call.function.arguments)
-                    if name == "write_file":
-                        path = arguments.get("path")
-                        if (WORKSPACE / path).exists():
-                            print("将覆盖已有文件")
-                    if name == "edit_file":
-                        old_text = arguments.get("old_text")
-                        new_text = arguments.get("new_text")
-                        print(f"被修改的文本为：{old_text},修改后的文本为：{new_text}")
-                    func = available_tools[name]
                     try:
                         args = json.loads(call.function.arguments)
-                        result = str(func(**args))
+                        if name in NEEDS_APPROVAL and not ask_approval(name,args):
+                            result = "用户拒绝了这次操作"
+                        else:
+                            result = str(available_tools[name](**args))
                     except Exception as e:
                         result = f"工具执行出错：{type(e).__name__}:{e}"
                 messages.append({
