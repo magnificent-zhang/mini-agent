@@ -72,7 +72,7 @@ def ask_approval(name, args):
     if name == "edit_file":
         old_text = args.get("old_text")
         new_text = args.get("new_text")
-        print(f"被修改的文本为：{old_text},修改后的文本为：{new_text}")
+        print(f"被修改的文本为：{old_text}\n修改后的文本为：{new_text}")
     answer = input("是否允许？(y/n) ")
     return answer.strip().lower() == "y"
 
@@ -192,7 +192,7 @@ available_tools = {
 
 NEEDS_APPROVAL = {"write_file","edit_file"}
 
-messages = [{"role": "system","content": "You are a useful assistant."}]
+messages = [{"role": "system","content": "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。"}]
 
 while True:
     user_input = input("User:")
