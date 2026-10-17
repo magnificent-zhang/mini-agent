@@ -66,7 +66,8 @@ def ask_approval(name, args):
     print(f"\n[需要审批] 工具：{name}")
     if name == "write_file":
         path = args.get("path")
-        if (WORKSPACE / path).exists():
+        full = safe_path(path)
+        if full.exists():
             print("将覆盖已有文件")
     if name == "edit_file":
         old_text = args.get("old_text")
