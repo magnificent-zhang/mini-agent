@@ -2,6 +2,8 @@ import os
 import json
 from openai import OpenAI
 from datetime import datetime
+from pathlib import Path
+
 
 client = OpenAI(
     api_key = os.environ["DEEPSEEK_API_KEY"],
@@ -9,6 +11,14 @@ client = OpenAI(
 )
 
 MODEL = "deepseek-flash"
+
+WORKSPACE = Path("workspace").resolve()
+
+def safe_path(path):
+    full = (WORKSPACE / path).resolve()
+    if not full.is_relative_to(WORKSPACE):
+        raise ValueError(f"不允许访问工作区之外的路径:{path}")
+    return full
 
 # 1. 一个普通的 Python 函数，这就是"工具"本身
 def get_current_time():
@@ -20,6 +30,17 @@ def multiply(a, b):
 
 def divide(a,b):
     return a / b
+
+def read_file(path):
+    full = safe_path(path)
+    content = full.read_text(encoding="utf-8")
+    return content[:5000]
+
+def list_files(path):
+    full = safe_path(path)
+    names = [p.name + ("/" if p.is_dir() else "") for p in full.iterdir()]
+    return "\n".join(names)
+
 
 tools = [
     {
@@ -63,6 +84,34 @@ tools = [
                 "required":["a","b"],
             }
         }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"read_file",
+            "description":"读一个指定文件的内容",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "path":{"type":"string","description":"相对于工作区的文件路径，例如 notes.txt"}
+                },
+                "required":["path"]
+            }
+        }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"list_files",
+            "description":"列举一个指定文件夹中的文件名称",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "path":{"type":"string","description":"相对于工作区的文件夹路径，列出工作区根目录请用"}
+                },
+                "required":["path"]
+            }
+        }
     }
 ]
 
@@ -70,6 +119,8 @@ available_tools = {
     "get_current_time": get_current_time,
     "multiply": multiply,
     "divide": divide,
+    "read_file":read_file,
+    "list_files":list_files
 }
 
 messages = [{"role": "system","content": "You are a useful assistant."}]
