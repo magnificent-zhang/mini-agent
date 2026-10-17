@@ -34,13 +34,21 @@ def divide(a,b):
 def read_file(path):
     full = safe_path(path)
     content = full.read_text(encoding="utf-8")
-    return content[:5000]
+    if len(content) > 5000:
+        return content[:5000] + "[文件过长，已截断，仅显示前 5000 个字符]"
+    else:
+        return content
 
 def list_files(path):
     full = safe_path(path)
     names = [p.name + ("/" if p.is_dir() else "") for p in full.iterdir()]
     return "\n".join(names)
 
+def write_file(path,content):
+    full = safe_path(path)
+    full.parent.mkdir(parents = True,exist_ok = True)
+    full.write_text(content,encoding="utf-8")
+    return f"已写入{path},共{len(content)}个字符"
 
 tools = [
     {
@@ -107,9 +115,24 @@ tools = [
             "parameters":{
                 "type":"object",
                 "properties":{
-                    "path":{"type":"string","description":"相对于工作区的文件夹路径，列出工作区根目录请用"}
+                    "path":{"type":"string","description":"相对于工作区的文件夹路径，列出工作区根目录请用."}
                 },
                 "required":["path"]
+            }
+        }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"write_file",
+            "description":"往一个指定文件夹中写文件",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "path":{"type":"string","description":"相对于工作区的文件路径，例如 work/hello.txt"},
+                    "content":{"type":"string","description":"需要被写进新文件的内容"}
+                },
+                "required":["path","content"]
             }
         }
     }
@@ -120,8 +143,11 @@ available_tools = {
     "multiply": multiply,
     "divide": divide,
     "read_file":read_file,
-    "list_files":list_files
+    "list_files":list_files,
+    "write_file":write_file
 }
+
+NEEDS_APPROVAL = {"write_file"}
 
 messages = [{"role": "system","content": "You are a useful assistant."}]
 
@@ -135,10 +161,11 @@ while True:
     messages.append({"role":"user","content":user_input})
     i = 0
     while True:
-        if i > 1:
+        if i > 10:
             print("超过最大轮数！")
             messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
             break
+        i = i + 1
         response = client.chat.completions.create(
             model = MODEL,
             messages = messages,
@@ -149,15 +176,19 @@ while True:
             messages.append(msg)
             for call in msg.tool_calls:
                 name = call.function.name
-                if name in available_tools:
+                if name not in available_tools:
+                    result = f"错误：工具 {name} 不存在。可用的工具有：{list(available_tools.keys())}"
+                elif name in NEEDS_APPROVAL and input(
+                    f"\n[需要审批] 工具：{name}\n参数：{call.function.arguments}\n是否允许？(y/n) "
+                ).strip().lower() != "y":
+                    result = "用户拒绝了这次操作"
+                else:
                     func = available_tools[name]
                     try:
                         args = json.loads(call.function.arguments)
                         result = str(func(**args))
                     except Exception as e:
                         result = f"工具执行出错：{type(e).__name__}:{e}"
-                else:
-                    result = f"错误：工具 {name} 不存在。可用的工具有：{list(available_tools.keys())}"
                 messages.append({
                     "role":"tool",
                     "tool_call_id":call.id,
