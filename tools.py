@@ -1,6 +1,10 @@
 from datetime import datetime
+import subprocess
+import os
 from pathlib import Path
 WORKSPACE = (Path(__file__).parent / "workspace").resolve()
+ALLOWED_ENV = ["PATH", "HOME", "LANG", "TERM"]
+
 
 def safe_path(path):
     full = (WORKSPACE / path).resolve()
@@ -43,6 +47,23 @@ def edit_file(path,old_text,new_text):
         full.write_text(content.replace(old_text, new_text), encoding="utf-8")
         return "编辑成功"
 
+def run_command(command):
+    try:
+        completed = subprocess.run(
+            command,
+            shell = True,
+            cwd = WORKSPACE,
+            capture_output = True,
+            text = True,
+            timeout = 30,
+            env = {k: os.environ[k] for k in ALLOWED_ENV if k in os.environ}
+        )
+        if not completed.returncode:
+            return f"运行成功，退出码为{completed.returncode}，命令的输出为：{completed.stdout[:200]}"
+        else:
+            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[:200]}"
+    except subprocess.TimeoutExpired:
+        return f"运行命令{command}超时，运行失败"
 
 TOOLS = [
     {
@@ -115,6 +136,20 @@ TOOLS = [
                 "required":["path","old_text","new_text"]
             }
         }
+    },
+    {
+        "type":"function",
+        "function":{
+            "name":"run_command",
+            "description":"运行命令，返回结果",
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "command":{"type":"string","description":"实际运行的命令"}
+                },
+                "required":["command"],
+            }
+        }
     }
 ]
 
@@ -123,7 +158,8 @@ AVAILABLE_TOOLS = {
     "read_file":read_file,
     "list_files":list_files,
     "write_file":write_file,
-    "edit_file":edit_file
+    "edit_file":edit_file,
+    "run_command":run_command
 }
 
-NEEDS_APPROVAL = {"write_file","edit_file"}
+NEEDS_APPROVAL = {"write_file","edit_file","run_command"}

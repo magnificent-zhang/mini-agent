@@ -22,6 +22,9 @@ def ask_approval(name, args):
         old_text = args.get("old_text")
         new_text = args.get("new_text")
         print(f"被修改的文本为：{old_text}\n修改后的文本为：{new_text}")
+    if name == "run_command":
+        command = args.get("command")
+        print(f"运行的命令是：{command}")
     answer = input("是否允许？(y/n) ")
     return answer.strip().lower() == "y"
 
