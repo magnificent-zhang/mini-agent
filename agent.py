@@ -1,7 +1,7 @@
 import os
 import json
 from openai import OpenAI
-from tools import TOOLS, AVAILABLE_TOOLS, NEEDS_APPROVAL, safe_path
+from tools import TOOLS, AVAILABLE_TOOLS, NEEDS_APPROVAL, safe_path, compact_tool_results
 
 
 client = OpenAI(
@@ -28,6 +28,8 @@ def ask_approval(name, args):
     answer = input("是否允许？(y/n) ")
     return answer.strip().lower() == "y"
 
+total_token = 0
+
 messages = [{"role": "system","content": "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。"}]
 
 while True:
@@ -40,17 +42,21 @@ while True:
     messages.append({"role":"user","content":user_input})
     i = 0
     while True:
-        if i > 10:
+        if i > 20:
             print("超过最大轮数！")
             messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
             break
         i = i + 1
+        compact_tool_results(messages)
         response = client.chat.completions.create(
             model = MODEL,
             messages = messages,
             tools = TOOLS,
         )
         msg = response.choices[0].message
+        usage = response.usage
+        total_token += usage.total_tokens
+        print(f"completions_token为：{usage.completion_tokens},prompt_token为：{usage.prompt_tokens}，总token为:{total_token}")
         if msg.tool_calls:
             messages.append(msg)
             for call in msg.tool_calls:

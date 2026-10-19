@@ -65,6 +65,12 @@ def run_command(command):
     except subprocess.TimeoutExpired:
         return f"运行命令{command}超时，运行失败"
 
+def compact_tool_results(messages, keep_last=3):
+    tool_msgs = [m for m in messages if isinstance(m,dict) and m.get("role") == "tool"]
+    for m in tool_msgs[:-keep_last]:
+        if len(m["content"]) > 200:
+             m["content"] = "[旧的工具结果已省略，如需要请重新调用工具获取]"
+        
 TOOLS = [
     {
         "type":"function",
@@ -163,3 +169,5 @@ AVAILABLE_TOOLS = {
 }
 
 NEEDS_APPROVAL = {"write_file","edit_file","run_command"}
+
+
