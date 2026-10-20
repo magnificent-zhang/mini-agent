@@ -65,11 +65,22 @@ def run_command(command):
     except subprocess.TimeoutExpired:
         return f"运行命令{command}超时，运行失败"
 
-def compact_tool_results(messages, keep_last=3):
-    tool_msgs = [m for m in messages if isinstance(m,dict) and m.get("role") == "tool"]
-    for m in tool_msgs[:-keep_last]:
-        if len(m["content"]) > 200:
-             m["content"] = "[旧的工具结果已省略，如需要请重新调用工具获取]"
+def ask_approval(name, args):
+    print(f"\n[需要审批] 工具：{name}")
+    if name == "write_file":
+        path = args.get("path")
+        full = safe_path(path)
+        if full.exists():
+            print("将覆盖已有文件")
+    if name == "edit_file":
+        old_text = args.get("old_text")
+        new_text = args.get("new_text")
+        print(f"被修改的文本为：{old_text}\n修改后的文本为：{new_text}")
+    if name == "run_command":
+        command = args.get("command")
+        print(f"运行的命令是：{command}")
+    answer = input("是否允许？(y/n) ")
+    return answer.strip().lower() == "y"
         
 TOOLS = [
     {

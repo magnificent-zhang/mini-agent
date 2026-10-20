@@ -1,0 +1,34 @@
+import json
+from pathlib import Path
+def analyze_log(session_id):
+    goal_file = Path(__file__).parent / "logs"
+    with open(f"{goal_file}/{session_id}.jsonl", "r", encoding = "utf-8") as f:
+        data = [json.loads(line) for line in f if line.strip()]
+    times = 0
+    prompt_tokens = 0
+    completion_tokens = 0
+    tool_calls = {}
+    error_times = 0
+    reject_times = 0
+    total_time = 0
+    for line in data:
+        if line.get("type") == "model_call":
+            times += 1
+            prompt_tokens += line.get("prompt_tokens")
+            completion_tokens += line.get("completion_tokens")
+        elif line.get("type") == "tool_call":
+            if line.get("name") in tool_calls:
+                tool_calls[line.get("name")] += 1
+            else:
+                tool_calls[line.get("name")] = 1
+            if line.get("isError") == True:
+                error_times += 1
+            if line.get("approved") == False:
+                reject_times += 1
+        if "seconds" in line:
+            total_time += line.get("seconds")
+    print(f"一共调用了{times}次模型，总共输入tokens：{prompt_tokens}，输出tokens：{completion_tokens}\n")
+    print(f"调用了{tool_calls.keys()}工具，各调用{tool_calls.values()}次，失败了{error_times}次，拒绝了{reject_times}次\n")
+    print(f"总耗时：{total_time}")
+
+analyze_log("35a18f21")
