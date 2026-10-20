@@ -12,12 +12,18 @@ def log_event(session_id, event_type, **data):
         "type": event_type,
         **data,
     }
-    LOG_DIR.mkdir(exist_ok=True)
     try:
         line = json.dumps(record,ensure_ascii = False,default = str)
     except Exception as e:
-        line = json.dumps({"time":record["time"],"session":record["session"],"type":record["type"],"error_mag":e})
+        line = json.dumps({
+            "time": record["time"],
+            "session": session_id,
+            "type": "log_error",
+            "original_type": event_type,
+            "error": f"{type(e).__name__}: {e}",
+        }, ensure_ascii=False)
     try:
+        LOG_DIR.mkdir(exist_ok=True)
         with open(LOG_DIR / f"{session_id}.jsonl","a",encoding = "utf-8") as f:
             f.write(line + "\n")
     except OSError as e:
