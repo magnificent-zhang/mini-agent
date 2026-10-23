@@ -61,26 +61,10 @@ def run_command(command):
         if not completed.returncode:
             return f"运行成功，退出码为{completed.returncode}，命令的输出为：{completed.stdout[:200]}"
         else:
-            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[:200]}"
+            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[100:]}"
     except subprocess.TimeoutExpired:
         return f"运行命令{command}超时，运行失败"
 
-def ask_approval(name, args):
-    print(f"\n[需要审批] 工具：{name}")
-    if name == "write_file":
-        path = args.get("path")
-        full = safe_path(path)
-        if full.exists():
-            print("将覆盖已有文件")
-    if name == "edit_file":
-        old_text = args.get("old_text")
-        new_text = args.get("new_text")
-        print(f"被修改的文本为：{old_text}\n修改后的文本为：{new_text}")
-    if name == "run_command":
-        command = args.get("command")
-        print(f"运行的命令是：{command}")
-    answer = input("是否允许？(y/n) ")
-    return answer.strip().lower() == "y"
         
 TOOLS = [
     {

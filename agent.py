@@ -1,7 +1,7 @@
 import os
 import json
 from openai import OpenAI
-from tools import TOOLS, AVAILABLE_TOOLS, NEEDS_APPROVAL, ask_approval
+from tools import TOOLS, AVAILABLE_TOOLS, NEEDS_APPROVAL, safe_path
 from context import compact_tool_results
 from logger import log_event
 import uuid
@@ -14,6 +14,97 @@ client = OpenAI(
 )
 
 MODEL = "deepseek-flash"
+
+def auto_approve(name, args):
+    return True
+
+def ask_approval(name, args):
+    print(f"\n[需要审批] 工具：{name}")
+    if name == "write_file":
+        path = args.get("path")
+        full = safe_path(path)
+        if full.exists():
+            print("将覆盖已有文件")
+    if name == "edit_file":
+        old_text = args.get("old_text")
+        new_text = args.get("new_text")
+        print(f"被修改的文本为：{old_text}\n修改后的文本为：{new_text}")
+    if name == "run_command":
+        command = args.get("command")
+        print(f"运行的命令是：{command}")
+    answer = input("是否允许？(y/n) ")
+    return answer.strip().lower() == "y"
+
+def run_agent_turn(messages,session_id,approve):
+    i = 0
+    final_answer = ""
+    prompt_tokens_count = 0
+    completion_tokens_count = 0
+    isHitMaxSteps = False
+    while True:
+        if i > 20:
+            print("超过最大轮数！")
+            isHitMaxSteps = True
+            messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
+            log_event(session_id,"max_steps",warning = "超过最大轮数限制")
+            break
+        i = i + 1
+        compact_tool_results(messages)
+        pre_time = time.perf_counter()
+        response = client.chat.completions.create(
+            model = MODEL,
+            messages = messages,
+            tools = TOOLS,
+        )
+        next_time = time.perf_counter()
+        msg = response.choices[0].message
+        usage = response.usage
+        prompt_tokens_count += usage.prompt_tokens
+        completion_tokens_count += usage.completion_tokens
+        print(f"completions_token为：{usage.completion_tokens},prompt_token为：{usage.prompt_tokens}")
+        log_event(session_id,"model_call",round = i,prompt_tokens = usage.prompt_tokens,completion_tokens = usage.completion_tokens,seconds = next_time - pre_time,isUseTools = True if msg.tool_calls else False)
+        if msg.tool_calls:
+            messages.append(msg)
+            for call in msg.tool_calls:
+                name = call.function.name
+                args = {}
+                cost_time = 0
+                isApproval = False
+                isError = False
+                if name not in AVAILABLE_TOOLS:
+                    result = f"错误：工具 {name} 不存在。可用的工具有：{list(AVAILABLE_TOOLS.keys())}"
+                else:
+                    try:
+                        args = json.loads(call.function.arguments)
+                        isApproval = name not in NEEDS_APPROVAL or approve(name,args)
+                        if not isApproval:
+                            result = "用户拒绝了这次操作"
+                        else:
+                            pre_time = time.perf_counter()
+                            result = str(AVAILABLE_TOOLS[name](**args))
+                            next_time = time.perf_counter()
+                            cost_time = next_time - pre_time
+                    except Exception as e:
+                        isError = True
+                        result = f"工具执行出错：{type(e).__name__}:{e}"
+                log_event(session_id,"tool_call",name = name,arguments = call.function.arguments,approved = True if isApproval else False,result = result,seconds = cost_time,isError = isError)
+                messages.append({
+                    "role":"tool",
+                    "tool_call_id":call.id,
+                    "content":result,
+                })
+        else:
+            final_answer = msg.content
+            messages.append({"role":"assistant","content":msg.content})
+            log_event(session_id,"final_answer",content = msg.content)
+            break
+    return {
+        "final_answer": final_answer,
+        "rounds": i,
+        "prompt_tokens": prompt_tokens_count,
+        "completion_tokens": completion_tokens_count,
+        "hit_max_steps": isHitMaxSteps,
+    }
 
 
 def main():
@@ -29,61 +120,9 @@ def main():
             continue
         messages.append({"role":"user","content":user_input})
         log_event(session_id,"user_message",content = user_input)
-        i = 0
-        while True:
-            if i > 20:
-                print("超过最大轮数！")
-                messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
-                log_event(session_id,"max_steps",warning = "超过最大轮数限制")
-                break
-            i = i + 1
-            compact_tool_results(messages)
-            pre_time = time.perf_counter()
-            response = client.chat.completions.create(
-                model = MODEL,
-                messages = messages,
-                tools = TOOLS,
-            )
-            next_time = time.perf_counter()
-            msg = response.choices[0].message
-            usage = response.usage
-            print(f"completions_token为：{usage.completion_tokens},prompt_token为：{usage.prompt_tokens}")
-            log_event(session_id,"model_call",round = i,prompt_tokens = usage.prompt_tokens,completion_tokens = usage.completion_tokens,seconds = next_time - pre_time,isUseTools = True if msg.tool_calls else False)
-            if msg.tool_calls:
-                messages.append(msg)
-                for call in msg.tool_calls:
-                    name = call.function.name
-                    args = {}
-                    cost_time = 0
-                    isApproval = False
-                    isError = False
-                    if name not in AVAILABLE_TOOLS:
-                        result = f"错误：工具 {name} 不存在。可用的工具有：{list(AVAILABLE_TOOLS.keys())}"
-                    else:
-                        try:
-                            args = json.loads(call.function.arguments)
-                            isApproval = name not in NEEDS_APPROVAL or ask_approval(name,args)
-                            if not isApproval:
-                                result = "用户拒绝了这次操作"
-                            else:
-                                pre_time = time.perf_counter()
-                                result = str(AVAILABLE_TOOLS[name](**args))
-                                next_time = time.perf_counter()
-                                cost_time = next_time - pre_time
-                        except Exception as e:
-                            isError = True
-                            result = f"工具执行出错：{type(e).__name__}:{e}"
-                    log_event(session_id,"tool_call",name = name,arguments = call.function.arguments,approved = True if isApproval else False,result = result,seconds = cost_time,isError = isError)
-                    messages.append({
-                        "role":"tool",
-                        "tool_call_id":call.id,
-                        "content":result,
-                    })
-            else:
-                print("model:",msg.content)
-                messages.append({"role":"assistant","content":msg.content})
-                log_event(session_id,"final_answer",content = msg.content)
-                break
+        result = run_agent_turn(messages,session_id, approve = ask_approval)
+        print("model:",result["final_answer"])
+        
 
 if __name__ == "__main__":
     main()

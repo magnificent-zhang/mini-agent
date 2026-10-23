@@ -19,6 +19,7 @@ def analyze_log(session_id):
             prompt_tokens += line.get("prompt_tokens")
             completion_tokens += line.get("completion_tokens") or 0
         elif line.get("type") == "tool_call":
+            name = line.get("name")
             tool_calls[name] = tool_calls.get(name, 0) + 1
             if line.get("isError") == True:
                 error_times += 1
