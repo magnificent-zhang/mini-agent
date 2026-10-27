@@ -47,6 +47,12 @@ def edit_file(path,old_text,new_text):
         full.write_text(content.replace(old_text, new_text), encoding="utf-8")
         return "编辑成功"
 
+
+def truncate_tail(text, limit=2000):
+    if len(text) <= limit:
+        return text
+    return f"[前面 {len(text) - limit} 个字符已省略]\n" + text[-limit:]
+
 def run_command(command):
     try:
         completed = subprocess.run(
@@ -59,9 +65,9 @@ def run_command(command):
             env = {k: os.environ[k] for k in ALLOWED_ENV if k in os.environ}
         )
         if not completed.returncode:
-            return f"运行成功，退出码为{completed.returncode}，命令的输出为：{completed.stdout[:2000]}+[结果已截断，只保留前2000个字符]，stderr的信息为：{completed.stderr}"
+            return f"运行成功，退出码为{completed.returncode}，命令的输出为：{truncate_tail(completed.stdout)}，stderr的信息为：{truncate_tail(completed.stderr)}"
         else:
-            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[-2000:]}+[结果已截断，只保留后2000个字符]，stdout的信息为：{completed.stdout}"
+            return f"运行失败，退出码为{completed.returncode}，错误信息为：{truncate_tail(completed.stdout)}，stdout的信息为：{truncate_tail(completed.stderr)}"
     except subprocess.TimeoutExpired:
         return f"运行命令{command}超时，运行失败"
 

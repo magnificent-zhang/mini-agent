@@ -14,6 +14,7 @@ client = OpenAI(
 )
 
 MODEL = "deepseek-flash"
+SYSTEM_PROMPT = "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。环境为：Python 3.14"
 
 def auto_approve(name, args):
     return True
@@ -72,7 +73,6 @@ def run_agent_turn(messages,session_id,approve):
                 isApproval = None
                 isError = False
                 if name not in AVAILABLE_TOOLS:
-                    isApproval = False
                     result = f"错误：工具 {name} 不存在。可用的工具有：{list(AVAILABLE_TOOLS.keys())}"
                 else:
                     try:
@@ -110,12 +110,12 @@ def run_agent_turn(messages,session_id,approve):
 
 def main():
     session_id = uuid.uuid4().hex[:8]
-    messages = [{"role": "system","content": "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。环境为：Python 3.14"}]
+    messages = [{"role": "system","content": SYSTEM_PROMPT}]
 
     while True:
         try:
             user_input = input("User:")
-        except:
+        except (KeyboardInterrupt, EOFError):
             print()
             print("see you later")
             break
