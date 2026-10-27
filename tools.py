@@ -59,9 +59,9 @@ def run_command(command):
             env = {k: os.environ[k] for k in ALLOWED_ENV if k in os.environ}
         )
         if not completed.returncode:
-            return f"运行成功，退出码为{completed.returncode}，命令的输出为：{completed.stdout[:200]}"
+            return f"运行成功，退出码为{completed.returncode}，命令的输出为：{completed.stdout[:2000]}+[结果已截断，只保留前2000个字符]，stderr的信息为：{completed.stderr}"
         else:
-            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[100:]}"
+            return f"运行失败，退出码为{completed.returncode}，错误信息为：{completed.stderr[-2000:]}+[结果已截断，只保留后2000个字符]，stdout的信息为：{completed.stdout}"
     except subprocess.TimeoutExpired:
         return f"运行命令{command}超时，运行失败"
 
@@ -142,7 +142,7 @@ TOOLS = [
         "type":"function",
         "function":{
             "name":"run_command",
-            "description":"运行命令，返回结果",
+            "description":"运行命令，命令在工作区目录下执行、超时 30 秒、输出会被截断。",
             "parameters":{
                 "type":"object",
                 "properties":{

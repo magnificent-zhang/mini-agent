@@ -24,5 +24,6 @@ def test_safe_path_absolute_path(tmp_path,monkeypatch):
 
 def test_run_command_to_get_API_KEY(tmp_path,monkeypatch):
     monkeypatch.setattr(tools,"WORKSPACE",tmp_path)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-secret")
     result = tools.run_command("echo $DEEPSEEK_API_KEY")
-    assert result == "运行成功，退出码为0，命令的输出为：\n"
+    assert "test-secret" not in result

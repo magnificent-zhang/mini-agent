@@ -10,10 +10,10 @@ BUGGY_CODE = """def average(numbers):
 
 scores = [90, 85, 77, 92]
 print("平均分：", average(scores))
-print("空列表的平均分：", average([]))
+print('空列表的平均分：', average([]))
 
 names = ["小明", "小红"]
-print("第三个人是：", names[2])
+print('第三个人是：', names[2])
 """
 
 ADD_CODE = """a = 37
@@ -26,6 +26,24 @@ print(add(a, b))
 """
 
 DATA_TEXT = "12\n7\n30\n18\n9\n"
+
+AVARAGE_CODE = """
+def avarage(numbers):
+    total = 0
+    for n in numbers:
+        total += n
+    return total / len(numbers)
+"""
+
+FACTORIAL_CODE = """
+def factorial(n):
+    if not isinstance(n, int) or n < 0:
+        raise ValueError("n 必须是非负整数")
+    result = 1
+    for i in range(2, n + 1):
+        result *= i
+    return result
+"""
 
 def run_python(workspace,args):
     return subprocess.run(
@@ -101,7 +119,8 @@ TASKS = [
     {
         "id":"more_steps",
         "files":{"data.txt":DATA_TEXT},
-        "prompt":"读 data.txt 里的数字，写一个脚本算出平均值，运行它并告诉我结果",
+        "prompt":"读 data.txt 里的数字，写一个命名为：avarage.py的脚本算出平均值，运行它并告诉我结果",
         "check":check_more_steps,
     }
 ]
+

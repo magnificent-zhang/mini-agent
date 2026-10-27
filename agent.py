@@ -42,7 +42,7 @@ def run_agent_turn(messages,session_id,approve):
     completion_tokens_count = 0
     isHitMaxSteps = False
     while True:
-        if i > 20:
+        if i >= 20:
             print("超过最大轮数！")
             isHitMaxSteps = True
             messages.append({"role":"assistant","content":"[任务未能在限定步数内完成]"})
@@ -61,7 +61,7 @@ def run_agent_turn(messages,session_id,approve):
         usage = response.usage
         prompt_tokens_count += usage.prompt_tokens
         completion_tokens_count += usage.completion_tokens
-        print(f"completions_token为：{usage.completion_tokens},prompt_token为：{usage.prompt_tokens}")
+        # print(f"completion_token为：{usage.completion_tokens},prompt_token为：{usage.prompt_tokens}")
         log_event(session_id,"model_call",round = i,prompt_tokens = usage.prompt_tokens,completion_tokens = usage.completion_tokens,seconds = next_time - pre_time,isUseTools = True if msg.tool_calls else False)
         if msg.tool_calls:
             messages.append(msg)
@@ -69,9 +69,10 @@ def run_agent_turn(messages,session_id,approve):
                 name = call.function.name
                 args = {}
                 cost_time = 0
-                isApproval = False
+                isApproval = None
                 isError = False
                 if name not in AVAILABLE_TOOLS:
+                    isApproval = False
                     result = f"错误：工具 {name} 不存在。可用的工具有：{list(AVAILABLE_TOOLS.keys())}"
                 else:
                     try:
@@ -87,7 +88,7 @@ def run_agent_turn(messages,session_id,approve):
                     except Exception as e:
                         isError = True
                         result = f"工具执行出错：{type(e).__name__}:{e}"
-                log_event(session_id,"tool_call",name = name,arguments = call.function.arguments,approved = True if isApproval else False,result = result,seconds = cost_time,isError = isError)
+                log_event(session_id,"tool_call",name = name,arguments = call.function.arguments,approved = isApproval ,result = result,seconds = cost_time,isError = isError)
                 messages.append({
                     "role":"tool",
                     "tool_call_id":call.id,
@@ -109,10 +110,15 @@ def run_agent_turn(messages,session_id,approve):
 
 def main():
     session_id = uuid.uuid4().hex[:8]
-    messages = [{"role": "system","content": "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。"}]
+    messages = [{"role": "system","content": "你是一个说话简洁但精准的助手，修改已有文件时只用 edit_file。edit_file 失败时，先用 read_file 查看原文，再提供更精确的 old_text 重试，不要改用 write_file 重写整个文件。环境为：Python 3.14"}]
 
     while True:
-        user_input = input("User:")
+        try:
+            user_input = input("User:")
+        except:
+            print()
+            print("see you later")
+            break
         if user_input.lower() in ["exit","quit"]:
             print("see you later")
             break
@@ -121,7 +127,8 @@ def main():
         messages.append({"role":"user","content":user_input})
         log_event(session_id,"user_message",content = user_input)
         result = run_agent_turn(messages,session_id, approve = ask_approval)
-        print("model:",result["final_answer"])
+        answer = (result["final_answer"] or "").strip()
+        print("model:",answer if answer else "[模型返回了空内容]")
         
 
 if __name__ == "__main__":

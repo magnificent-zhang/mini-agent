@@ -16,7 +16,7 @@ def analyze_log(session_id):
     for line in data:
         if line.get("type") == "model_call":
             times += 1
-            prompt_tokens += line.get("prompt_tokens")
+            prompt_tokens += line.get("prompt_tokens") or 0
             completion_tokens += line.get("completion_tokens") or 0
         elif line.get("type") == "tool_call":
             name = line.get("name")
